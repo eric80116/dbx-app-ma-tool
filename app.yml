@@ -1,0 +1,18 @@
+command: ["uvicorn", "ma_app.backend.app:app", "--workers", "2"]
+
+# Environment for the deployed Databricks App. These are configuration (not secrets);
+# change them per environment. The App service principal needs USE/SELECT/MODIFY on the
+# App schema and CAN_USE on the warehouse (granted by scripts/deploy.sh).
+env:
+  - name: MA_APP_TARGET_CATALOG
+    value: "ma_app_demo"
+  - name: MA_APP_APP_SCHEMA
+    value: "ma_app"
+  - name: MA_APP_WAREHOUSE_ID
+    value: ""
+  - name: MA_APP_AUDIENCE_SOURCE_MODE
+    value: "local_snapshot"
+  - name: MA_APP_REVEAL_PII_ALLOWED
+    value: "true"
+  - name: DATABRICKS_SQL_WAREHOUSE_ID
+    value: ""

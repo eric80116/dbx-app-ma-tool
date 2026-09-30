@@ -1,0 +1,7 @@
+# Bundle-level permissions apply to every resource the bundle deploys (App + jobs).
+# Kept least-privilege for a shared demo sandbox. UC grants for the App service principal
+# (USE/SELECT/MODIFY on the App schema, CAN_USE on the warehouse) are applied by
+# scripts/deploy.sh once the App's service principal id is known.
+permissions:
+  - level: CAN_MANAGE
+    group_name: users

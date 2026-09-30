@@ -1,0 +1,8 @@
+# Databricks App resource. Runtime env vars live in the deployed app.yml (source dir),
+# not here. The built frontend + wheel are in ./.build (see artifacts: apx build).
+resources:
+  apps:
+    ma_app:
+      name: "ma-app"
+      description: "MA orchestration demo (synthetic data / mock activation only)."
+      source_code_path: ../.build

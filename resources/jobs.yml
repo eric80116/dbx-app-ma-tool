@@ -1,0 +1,121 @@
+# Serverless setup/seed job. Creates App-owned tables and loads the synthetic snapshot.
+# Only ever writes to <target_catalog>.<app_schema>; never touches CMEG source data.
+resources:
+  jobs:
+    ma_app_setup_job:
+      name: "[${bundle.target}] ma-app setup + seed"
+      tasks:
+        - task_key: setup_and_seed
+          spark_python_task:
+            python_file: ../setup/run_setup.py
+            parameters:
+              - "--catalog"
+              - "${var.target_catalog}"
+              - "--schema"
+              - "${var.app_schema}"
+              - "--warehouse-id"
+              - "${var.warehouse_id}"
+              - "--audience-source-mode"
+              - "${var.audience_source_mode}"
+          environment_key: setup_env
+      environments:
+        - environment_key: setup_env
+          spec:
+            client: "2"
+            dependencies:
+              - fastapi
+              - pydantic-settings
+              - python-dotenv
+              - databricks-sdk
+
+    # Parameterized dispatcher (no schedule). The App SP creates a one-time wrapper job
+    # that triggers this via run_job_task at the campaign's scheduled time. The `ma_app`
+    # tag is how the App resolves this job's id at runtime.
+    ma_app_dispatch_job:
+      name: "[${bundle.target}] ma-app dispatch"
+      tags:
+        ma_app: dispatch
+      parameters:
+        - name: campaign_id
+          default: ""
+      tasks:
+        - task_key: dispatch_one
+          spark_python_task:
+            python_file: ../setup/run_dispatch.py
+            parameters:
+              - "--campaign-id"
+              - "{{job.parameters.campaign_id}}"
+              - "--catalog"
+              - "${var.target_catalog}"
+              - "--schema"
+              - "${var.app_schema}"
+              - "--warehouse-id"
+              - "${var.warehouse_id}"
+          environment_key: dispatch_env
+      environments:
+        - environment_key: dispatch_env
+          spec:
+            client: "2"
+            dependencies:
+              - fastapi
+              - pydantic-settings
+              - python-dotenv
+              - databricks-sdk
+
+    # Checking/reconcile job: safety net for missed schedules + cleanup of spent wrapper
+    # jobs. Runs every 10 minutes.
+    ma_app_reconcile_job:
+      name: "[${bundle.target}] ma-app reconcile"
+      tags:
+        ma_app: reconcile
+      schedule:
+        quartz_cron_expression: "0 */10 * * * ?"
+        timezone_id: UTC
+        pause_status: UNPAUSED
+      tasks:
+        - task_key: reconcile
+          spark_python_task:
+            python_file: ../setup/run_reconcile.py
+            parameters:
+              - "--catalog"
+              - "${var.target_catalog}"
+              - "--schema"
+              - "${var.app_schema}"
+              - "--warehouse-id"
+              - "${var.warehouse_id}"
+          environment_key: reconcile_env
+      environments:
+        - environment_key: reconcile_env
+          spec:
+            client: "2"
+            dependencies:
+              - fastapi
+              - pydantic-settings
+              - python-dotenv
+              - databricks-sdk
+
+    # Optional: run the pytest integration/acceptance suite against the deployed schema.
+    ma_app_test_job:
+      name: "[${bundle.target}] ma-app integration tests"
+      tasks:
+        - task_key: pytest
+          spark_python_task:
+            python_file: ../setup/run_tests_task.py
+            parameters:
+              - "--catalog"
+              - "${var.target_catalog}"
+              - "--schema"
+              - "${var.app_schema}"
+              - "--warehouse-id"
+              - "${var.warehouse_id}"
+          environment_key: test_env
+      environments:
+        - environment_key: test_env
+          spec:
+            client: "2"
+            dependencies:
+              - fastapi
+              - pydantic-settings
+              - python-dotenv
+              - databricks-sdk
+              - pytest
